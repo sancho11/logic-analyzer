@@ -1,58 +1,142 @@
-# Logic Analyzer
+# Logic Analyzer – Firmware & Backend
 
-A few days ago I needed a logic analyzer since I don't have any (and them are quite expensive) I thought to write my own code. It will work on every Arduino board, AVR, STM32 and ESP8266. It could be very helpful to debug ISP, I2C and other serial communication where you think that could be an error.
+Firmware and serial backend for a browser‑based logic analyzer.  
+This repository contains microcontroller sketches (Arduino‑compatible) that capture digital signals and stream them over serial for visualization in the **Web GUI**.
 
-![la](https://image.ibb.co/mEAvfU/3.jpg)
+> **Fork notice:** This project is a fork of [aster94/logic-analyzer](https://github.com/aster94/logic-analyzer), adapted and simplified to work seamlessly with the new Web GUI and modern tooling.
 
-## Usage
+---
 
-- Upload `UNO.ino`, `MEGA.ino`, `STM32F1.ino` or `ESP8266.ino` to your board
-- choose your board and serial port on `processing.pde`
-- run it and have a good debug :D
+## Overview
 
-If you wish you could put a LED to see when the MCU is recording, see the code of your board to know where to wire it. The number of samples is set to 200 but you could increment it until the memory is full.
+The backend runs on supported microcontrollers and:
+- Samples digital input pins
+- Timestamps transitions
+- Streams compact capture data over **Serial**
+- Integrates with the **Web GUI** (HTML5 Canvas + Web Serial) for live viewing and analysis
 
-To have it faster than possible the loop was reduced to the minimum number of statement and I am doing a lot of optimization! All the calculation are made after saving the data, and during the recording there are stored only the values of the pin that changed and when it happened.
+**Frontend Web GUI:** `https://github.com/sancho11/logic-analyzer-computerinterface`
 
-I made a processing sketch to visualize it. Using the bar scroll at the bottom of the graph you could move along the captures or alternatively you could use the wheel of the mouse. With the "Start" button you can begin a new recording. Two divider have been added: one to use millisecond instead of microsecond and the other that work like a kind of "zoom" (to change it move the mouse over this button than use the mouse wheel; decreasing it you will zoom in, increasing zoom out). You are also able to save the current window in a .jpg or .tif file with the "Save" button.
+---
 
-It works on Windows and Linux both 32 64 bit and android devices. I added also an Arduino test sketch if you would like to test the logic analyzer. 
-Enjoy!
+## Features
 
-## Requisites
+- **Multiple boards supported:** Arduino **UNO**, **MEGA**, **STM32F1**, **ESP8266**
+- **Edge-based capture:** Records pin changes with timestamps for efficient streaming
+- **Lightweight protocol:** Simple line‑oriented serial messages, easy to extend
+- **Test sketch included:** Quickly validate wiring and visualize known patterns
+- **Open-source & hackable:** Clear code paths to add boards or tweak timing
 
-- [Arduino IDE](https://www.arduino.cc/en/main/software)
-- [Processing](https://processing.org/download/)
+---
 
-# Change Log
+## Repository Structure
 
-##### 06/01/19
-- ESP8266 version by @yoursunny, who also made a few improvements to processing, thanks!
+```
+logic-analyzer/
+├─ LICENSE
+├─ README.md                        # (You are here)
+├─ .gitignore
+├─ Microcontroller_Code/
+│  ├─ UNO/UNO.ino                   # Arduino Uno firmware
+│  ├─ MEGA/MEGA.ino                 # Arduino Mega firmware
+│  ├─ STM32F1/STM32F1.ino           # STM32F1 (Arduino_STM32 core)
+│  └─ ESP8266/ESP8266.ino           # ESP8266 (3.3V logic)
+└─ Extras/
+   └─ tester/tester.ino             # Generates known waveforms for validation
+```
 
-##### 30/08/18
-- MEGA version added by @sancho11 but the processing interface is not compatible for all the pins
+---
 
-##### 29/04/17
-- added support for STM32F1 using the [Arduino_STM32 core](https://github.com/rogerclarkmelbourne/Arduino_STM32)
+## Supported Boards
 
-##### 15/12/16
-- improved acquisition code
+- **Arduino UNO (ATmega328P)** – 5V logic, limited RAM  
+- **Arduino MEGA (ATmega2560)** – more pins and RAM for deeper captures  
+- **STM32F1** (via [Arduino_STM32 core](https://github.com/rogerclarkmelbourne/Arduino_STM32)) – faster sampling potential  
+- **ESP8266** – 3.3V logic; ensure proper level shifting
 
-##### 12/12/16
-- added bar scroll
-- now moving along the capture is far away easier
+> ⚠️ **Logic levels & safety**  
+> • Never feed **5V** into **3.3V‑only** boards (e.g., ESP8266) without level shifting.  
+> • Keep total input current within MCU specs; use series resistors if unsure.
 
-##### 04/12/16
-- better reducer and save options
-- added the possibility to diplay or not the times
-- corrected a bug when two or more pulse where coincident
+---
 
-##### 28/11/16
-- completely new interface
-- added save function
+## Getting Started
 
-##### 26/11/16
-- added colors
+### Requirements
+- **Arduino IDE** (or **PlatformIO**)
+- Appropriate **USB drivers** for your board
+- A supported browser for the GUI (Chrome/Edge for Web Serial) — used on the frontend
 
-##### 24/11/16
-- published
+### 1) Flash the Firmware
+1. Open the correct sketch from `Microcontroller_Code/<BOARD>/<BOARD>.ino`.  
+2. In **Arduino IDE**, select the **Board** and **Port**.  
+3. Click **Upload**.
+
+### 2) (Optional) Validate with the Tester
+1. Flash `Extras/tester/tester.ino` to a spare board.  
+2. Wire the tester’s output pins to the analyzer board’s inputs.  
+3. Use the Web GUI to verify you see the expected patterns.
+
+### 3) Use with the Web GUI
+1. Open the **Web GUI**: `https://github.com/sancho11/logic-analyzer-computerinterface`  
+2. Click **Connect**, select your device’s **serial port**, and choose the correct **board profile**.  
+3. Press **Start** to capture and visualize signals (or use **Simulate** in the GUI if you’re testing without hardware).
+
+---
+
+## High‑Level Protocol
+
+The firmware:
+- Monitors configured digital pins  
+- On each transition, records **timestamp** + **pin state mask** (or pin index)  
+- Streams records over **Serial** in a compact, line‑oriented format that the Web GUI parses in real time
+
+**Notes**
+- Timestamps are microsecond or tick‑based depending on the board/timer setup.  
+- Keep serial baud rate and buffer sizes in sync with GUI defaults (tune in code as needed).  
+- If you customize the message format, update the GUI parser accordingly.
+
+---
+
+## Performance & Limits
+
+- **Depth** and **throughput** depend on board speed, baud rate, and number of active pins.  
+- On smaller MCUs, prefer **edge‑based capture** (only changes) over fixed‑rate sampling to maximize effective detail.  
+- For higher‑frequency signals, pick faster MCUs with more RAM, and reduce the number of monitored pins.
+
+---
+
+## Extending / Porting
+
+- Start from the closest board in `Microcontroller_Code/`  
+- Keep the same **message format** to remain compatible with the Web GUI  
+- Document board‑specific **pin maps** or **LED indicators** in code comments  
+- Submit improvements as PRs (see **Contributing**)
+
+---
+
+## Contributing
+
+Contributions are welcome!
+
+1. **Fork** the repository  
+2. Create a feature branch:
+   ```bash
+   git checkout -b feat/stm32f1-timer-tuning
+   ```
+3. Make your changes with clear commits  
+4. Ensure the firmware builds and streams correctly; test with the **Web GUI**  
+5. Open a **Pull Request** with a concise description and any scope/limits
+
+**Coding tips**
+- Keep the **capture loop minimal**; favor post‑processing where possible  
+- Avoid magic numbers; prefer `#define`/`const` with comments  
+- Be mindful of ISR time and serial buffer sizes
+
+---
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 (GPL‑3.0)** — see the `LICENSE` file for details.  
+Original work by [aster94](https://github.com/aster94), forked and adapted for the Web GUI.
+
